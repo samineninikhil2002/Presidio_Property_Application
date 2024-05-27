@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Post Property</title>
+</head>
+<body>
+    <h2>Post Property</h2>
+    <form id="propertyForm">
+        <label for="area">Area (sq ft):</label><br>
+        <input type="text" id="area" name="area" required><br>
+        <label for="bedrooms">Number of Bedrooms:</label><br>
+        <input type="number" id="bedrooms" name="bedrooms" required><br>
+        <label for="bathrooms">Number of Bathrooms:</label><br>
+        <input type="number" id="bathrooms" name="bathrooms" required><br>
+        <label for="hospitals">Nearby Hospitals:</label><br>
+        <input type="text" id="hospitals" name="hospitals" required><br>
+        <label for="colleges">Nearby Colleges:</label><br>
+        <input type="text" id="colleges" name="colleges" required><br><br>
+        <input type="submit" value="Post Property">
+    </form>
+
+    <script>
+        document.getElementById('propertyForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const property = {
+                area: event.target.area.value,
+                bedrooms: event.target.bedrooms.value,
+                bathrooms: event.target.bathrooms.value,
+                hospitals: event.target.hospitals.value,
+                colleges: event.target.colleges.value
+            };
+            fetch('http://localhost:3000/properties', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(property)
+            }).then(response => {
+                if (response.ok) {
+                    alert('Property posted successfully!');
+                } else {
+                    alert('Failed to post property.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

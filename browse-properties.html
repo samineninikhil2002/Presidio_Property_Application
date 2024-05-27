@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Properties</title>
+</head>
+<body>
+    <h2>Properties for Rent</h2>
+    <form id="filterForm">
+        <label for="minArea">Minimum Area (sq ft):</label><br>
+        <input type="text" id="minArea" name="minArea"><br>
+        <label for="maxArea">Maximum Area (sq ft):</label><br>
+        <input type="text" id="maxArea" name="maxArea"><br>
+        <label for="minBedrooms">Minimum Bedrooms:</label><br>
+        <input type="number" id="minBedrooms" name="minBedrooms"><br>
+        <label for="maxBedrooms">Maximum Bedrooms:</label><br>
+        <input type="number" id="maxBedrooms" name="maxBedrooms"><br>
+        <label for="minBathrooms">Minimum Bathrooms:</label><br>
+        <input type="number" id="minBathrooms" name="minBathrooms"><br>
+        <label for="maxBathrooms">Maximum Bathrooms:</label><br>
+        <input type="number" id="maxBathrooms" name="maxBathrooms"><br><br>
+        <input type="submit" value="Apply Filters">
+    </form>
+
+    <div id="propertiesList"></div>
+
+    <script>
+        const properties = [];
+
+        function loadProperties(filters = {}) {
+            const propertiesList = document.getElementById('propertiesList');
+            propertiesList.innerHTML = '';
+            properties.filter(property => {
+                return (!filters.minArea || property.area >= filters.minArea) &&
+                       (!filters.maxArea || property.area <= filters.maxArea) &&
+                       (!filters.minBedrooms || property.bedrooms >= filters.minBedrooms) &&
+                       (!filters.maxBedrooms || property.bedrooms <= filters.maxBedrooms) &&
+                       (!filters.minBathrooms || property.bathrooms >= filters.minBathrooms) &&
+                       (!filters.maxBathrooms || property.bathrooms <= filters.maxBathrooms);
+            }).forEach(property => {
+                const propertyDiv = document.createElement('div');
+                propertyDiv.innerHTML = `
+                    <p>Area: ${property.area} sq ft</p>
+                    <p>Bedrooms: ${property.bedrooms}</p>
+                    <p>Bathrooms: ${property.bathrooms}</p>
+                    <p>Nearby Hospitals: ${property.hospitals}</p>
+                    <p>Nearby Colleges: ${property.colleges}</p>
+                    <button onclick="showSellerDetails('${property.seller}')">I'm Interested</button>
+                    <hr>
+                `
+                propertiesList.appendChild(propertyDiv);
+            });
+        }
+
+        function showSellerDetails(seller) {
+            alert('Seller details: ' + seller);
+        }
+
+        document.getElementById('filterForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const filters = {
+                minArea: event.target.minArea.value,
+                maxArea: event.target.maxArea.value,
+                minBedrooms: event.target.minBedrooms.value,
+                maxBedrooms: event.target.maxBedrooms.value,
+                minBathrooms: event.target.minBathrooms.value,
+                maxBathrooms: event.target.maxBathrooms.value
+            };
+            loadProperties(filters);
+        });
+
+        fetch('http://localhost:3000/properties')
+            .then(response => response.json())
+            .then(data => {
+                properties.push(...data);
+                loadProperties();
+            });
+    </script>
+</body>
+</html>
