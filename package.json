@@ -1,46 +1,32 @@
 {
-    "name": "iconv-lite",
-    "description": "Convert character encodings in pure javascript.",
-    "version": "0.4.24",
-    "license": "MIT",
-    "keywords": [
-        "iconv",
-        "convert",
-        "charset",
-        "icu"
-    ],
-    "author": "Alexander Shtuchkin <ashtuchkin@gmail.com>",
-    "main": "./lib/index.js",
-    "typings": "./lib/index.d.ts",
-    "homepage": "https://github.com/ashtuchkin/iconv-lite",
-    "bugs": "https://github.com/ashtuchkin/iconv-lite/issues",
-    "repository": {
-        "type": "git",
-        "url": "git://github.com/ashtuchkin/iconv-lite.git"
-    },
-    "engines": {
-        "node": ">=0.10.0"
-    },
-    "scripts": {
-        "coverage": "istanbul cover _mocha -- --grep .",
-        "coverage-open": "open coverage/lcov-report/index.html",
-        "test": "mocha --reporter spec --grep ."
-    },
-    "browser": {
-        "./lib/extend-node": false,
-        "./lib/streams": false
-    },
-    "devDependencies": {
-        "mocha": "^3.1.0",
-        "request": "~2.87.0",
-        "unorm": "*",
-        "errto": "*",
-        "async": "*",
-        "istanbul": "*",
-        "semver": "*",
-        "iconv": "*"
-    },
-    "dependencies": {
-        "safer-buffer": ">= 2.1.2 < 3"
-    }
+  "name": "merge-descriptors",
+  "description": "Merge objects using descriptors",
+  "version": "1.0.1",
+  "author": {
+    "name": "Jonathan Ong",
+    "email": "me@jongleberry.com",
+    "url": "http://jongleberry.com",
+    "twitter": "https://twitter.com/jongleberry"
+  },
+  "contributors": [
+    "Douglas Christopher Wilson <doug@somethingdoug.com>",
+    "Mike Grabowski <grabbou@gmail.com>"
+  ],
+  "license": "MIT",
+  "repository": "component/merge-descriptors",
+  "devDependencies": {
+    "istanbul": "0.4.1",
+    "mocha": "1.21.5"
+  },
+  "files": [
+    "HISTORY.md",
+    "LICENSE",
+    "README.md",
+    "index.js"
+  ],
+  "scripts": {
+    "test": "mocha --reporter spec --bail --check-leaks test/",
+    "test-ci": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --reporter spec --check-leaks test/",
+    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --reporter dot --check-leaks test/"
+  }
 }
