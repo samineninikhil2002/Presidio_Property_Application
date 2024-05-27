@@ -1,80 +1,49 @@
-# EE First
+# es-define-property <sup>[![Version Badge][npm-version-svg]][package-url]</sup>
 
-[![NPM version][npm-image]][npm-url]
-[![Build status][travis-image]][travis-url]
-[![Test coverage][coveralls-image]][coveralls-url]
+[![github actions][actions-image]][actions-url]
+[![coverage][codecov-image]][codecov-url]
 [![License][license-image]][license-url]
 [![Downloads][downloads-image]][downloads-url]
-[![Gittip][gittip-image]][gittip-url]
 
-Get the first event in a set of event emitters and event pairs,
-then clean up after itself.
+[![npm badge][npm-badge-png]][package-url]
 
-## Install
+`Object.defineProperty`, but not IE 8's broken one.
 
-```sh
-$ npm install ee-first
-```
-
-## API
+## Example
 
 ```js
-var first = require('ee-first')
+const assert = require('assert');
+
+const $defineProperty = require('es-define-property');
+
+if ($defineProperty) {
+    assert.equal($defineProperty, Object.defineProperty);
+} else if (Object.defineProperty) {
+    assert.equal($defineProperty, false, 'this is IE 8');
+} else {
+    assert.equal($defineProperty, false, 'this is an ES3 engine');
+}
 ```
 
-### first(arr, listener)
+## Tests
+Simply clone the repo, `npm install`, and run `npm test`
 
-Invoke `listener` on the first event from the list specified in `arr`. `arr` is
-an array of arrays, with each array in the format `[ee, ...event]`. `listener`
-will be called only once, the first time any of the given events are emitted. If
-`error` is one of the listened events, then if that fires first, the `listener`
-will be given the `err` argument.
+## Security
 
-The `listener` is invoked as `listener(err, ee, event, args)`, where `err` is the
-first argument emitted from an `error` event, if applicable; `ee` is the event
-emitter that fired; `event` is the string event name that fired; and `args` is an
-array of the arguments that were emitted on the event.
+Please email [@ljharb](https://github.com/ljharb) or see https://tidelift.com/security if you have a potential security vulnerability to report.
 
-```js
-var ee1 = new EventEmitter()
-var ee2 = new EventEmitter()
-
-first([
-  [ee1, 'close', 'end', 'error'],
-  [ee2, 'error']
-], function (err, ee, event, args) {
-  // listener invoked
-})
-```
-
-#### .cancel()
-
-The group of listeners can be cancelled before being invoked and have all the event
-listeners removed from the underlying event emitters.
-
-```js
-var thunk = first([
-  [ee1, 'close', 'end', 'error'],
-  [ee2, 'error']
-], function (err, ee, event, args) {
-  // listener invoked
-})
-
-// cancel and clean up
-thunk.cancel()
-```
-
-[npm-image]: https://img.shields.io/npm/v/ee-first.svg?style=flat-square
-[npm-url]: https://npmjs.org/package/ee-first
-[github-tag]: http://img.shields.io/github/tag/jonathanong/ee-first.svg?style=flat-square
-[github-url]: https://github.com/jonathanong/ee-first/tags
-[travis-image]: https://img.shields.io/travis/jonathanong/ee-first.svg?style=flat-square
-[travis-url]: https://travis-ci.org/jonathanong/ee-first
-[coveralls-image]: https://img.shields.io/coveralls/jonathanong/ee-first.svg?style=flat-square
-[coveralls-url]: https://coveralls.io/r/jonathanong/ee-first?branch=master
-[license-image]: http://img.shields.io/npm/l/ee-first.svg?style=flat-square
-[license-url]: LICENSE.md
-[downloads-image]: http://img.shields.io/npm/dm/ee-first.svg?style=flat-square
-[downloads-url]: https://npmjs.org/package/ee-first
-[gittip-image]: https://img.shields.io/gittip/jonathanong.svg?style=flat-square
-[gittip-url]: https://www.gittip.com/jonathanong/
+[package-url]: https://npmjs.org/package/es-define-property
+[npm-version-svg]: https://versionbadg.es/ljharb/es-define-property.svg
+[deps-svg]: https://david-dm.org/ljharb/es-define-property.svg
+[deps-url]: https://david-dm.org/ljharb/es-define-property
+[dev-deps-svg]: https://david-dm.org/ljharb/es-define-property/dev-status.svg
+[dev-deps-url]: https://david-dm.org/ljharb/es-define-property#info=devDependencies
+[npm-badge-png]: https://nodei.co/npm/es-define-property.png?downloads=true&stars=true
+[license-image]: https://img.shields.io/npm/l/es-define-property.svg
+[license-url]: LICENSE
+[downloads-image]: https://img.shields.io/npm/dm/es-define-property.svg
+[downloads-url]: https://npm-stat.com/charts.html?package=es-define-property
+[codecov-image]: https://codecov.io/gh/ljharb/es-define-property/branch/main/graphs/badge.svg
+[codecov-url]: https://app.codecov.io/gh/ljharb/es-define-property/
+[actions-image]: https://img.shields.io/endpoint?url=https://github-actions-badge-u3jn4tfpocch.runkit.sh/ljharb/es-define-property
+[actions-url]: https://github.com/ljharb/es-define-property/actions
