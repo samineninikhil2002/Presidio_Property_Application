@@ -1,32 +1,37 @@
 {
-  "name": "merge-descriptors",
-  "description": "Merge objects using descriptors",
-  "version": "1.0.1",
-  "author": {
-    "name": "Jonathan Ong",
-    "email": "me@jongleberry.com",
-    "url": "http://jongleberry.com",
-    "twitter": "https://twitter.com/jongleberry"
-  },
-  "contributors": [
-    "Douglas Christopher Wilson <doug@somethingdoug.com>",
-    "Mike Grabowski <grabbou@gmail.com>"
-  ],
-  "license": "MIT",
-  "repository": "component/merge-descriptors",
-  "devDependencies": {
-    "istanbul": "0.4.1",
-    "mocha": "1.21.5"
-  },
+  "name": "ms",
+  "version": "2.0.0",
+  "description": "Tiny milisecond conversion utility",
+  "repository": "zeit/ms",
+  "main": "./index",
   "files": [
-    "HISTORY.md",
-    "LICENSE",
-    "README.md",
     "index.js"
   ],
   "scripts": {
-    "test": "mocha --reporter spec --bail --check-leaks test/",
-    "test-ci": "istanbul cover node_modules/mocha/bin/_mocha --report lcovonly -- --reporter spec --check-leaks test/",
-    "test-cov": "istanbul cover node_modules/mocha/bin/_mocha -- --reporter dot --check-leaks test/"
+    "precommit": "lint-staged",
+    "lint": "eslint lib/* bin/*",
+    "test": "mocha tests.js"
+  },
+  "eslintConfig": {
+    "extends": "eslint:recommended",
+    "env": {
+      "node": true,
+      "es6": true
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "npm run lint",
+      "prettier --single-quote --write",
+      "git add"
+    ]
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "3.19.0",
+    "expect.js": "0.3.1",
+    "husky": "0.13.3",
+    "lint-staged": "3.4.1",
+    "mocha": "3.4.1"
   }
 }
