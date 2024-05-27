@@ -1,225 +1,238 @@
-/*!
- * content-type
- * Copyright(c) 2015 Douglas Christopher Wilson
- * MIT Licensed
- */
+(function () {
 
-'use strict'
+  'use strict';
 
-/**
- * RegExp to match *( ";" parameter ) in RFC 7231 sec 3.1.1.1
- *
- * parameter     = token "=" ( token / quoted-string )
- * token         = 1*tchar
- * tchar         = "!" / "#" / "$" / "%" / "&" / "'" / "*"
- *               / "+" / "-" / "." / "^" / "_" / "`" / "|" / "~"
- *               / DIGIT / ALPHA
- *               ; any VCHAR, except delimiters
- * quoted-string = DQUOTE *( qdtext / quoted-pair ) DQUOTE
- * qdtext        = HTAB / SP / %x21 / %x23-5B / %x5D-7E / obs-text
- * obs-text      = %x80-FF
- * quoted-pair   = "\" ( HTAB / SP / VCHAR / obs-text )
- */
-var PARAM_REGEXP = /; *([!#$%&'*+.^_`|~0-9A-Za-z-]+) *= *("(?:[\u000b\u0020\u0021\u0023-\u005b\u005d-\u007e\u0080-\u00ff]|\\[\u000b\u0020-\u00ff])*"|[!#$%&'*+.^_`|~0-9A-Za-z-]+) */g // eslint-disable-line no-control-regex
-var TEXT_REGEXP = /^[\u000b\u0020-\u007e\u0080-\u00ff]+$/ // eslint-disable-line no-control-regex
-var TOKEN_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
+  var assign = require('object-assign');
+  var vary = require('vary');
 
-/**
- * RegExp to match quoted-pair in RFC 7230 sec 3.2.6
- *
- * quoted-pair = "\" ( HTAB / SP / VCHAR / obs-text )
- * obs-text    = %x80-FF
- */
-var QESC_REGEXP = /\\([\u000b\u0020-\u00ff])/g // eslint-disable-line no-control-regex
+  var defaults = {
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    preflightContinue: false,
+    optionsSuccessStatus: 204
+  };
 
-/**
- * RegExp to match chars that must be quoted-pair in RFC 7230 sec 3.2.6
- */
-var QUOTE_REGEXP = /([\\"])/g
-
-/**
- * RegExp to match type in RFC 7231 sec 3.1.1.1
- *
- * media-type = type "/" subtype
- * type       = token
- * subtype    = token
- */
-var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/
-
-/**
- * Module exports.
- * @public
- */
-
-exports.format = format
-exports.parse = parse
-
-/**
- * Format object to media type.
- *
- * @param {object} obj
- * @return {string}
- * @public
- */
-
-function format (obj) {
-  if (!obj || typeof obj !== 'object') {
-    throw new TypeError('argument obj is required')
+  function isString(s) {
+    return typeof s === 'string' || s instanceof String;
   }
 
-  var parameters = obj.parameters
-  var type = obj.type
-
-  if (!type || !TYPE_REGEXP.test(type)) {
-    throw new TypeError('invalid type')
-  }
-
-  var string = type
-
-  // append parameters
-  if (parameters && typeof parameters === 'object') {
-    var param
-    var params = Object.keys(parameters).sort()
-
-    for (var i = 0; i < params.length; i++) {
-      param = params[i]
-
-      if (!TOKEN_REGEXP.test(param)) {
-        throw new TypeError('invalid parameter name')
-      }
-
-      string += '; ' + param + '=' + qstring(parameters[param])
-    }
-  }
-
-  return string
-}
-
-/**
- * Parse media type to object.
- *
- * @param {string|object} string
- * @return {Object}
- * @public
- */
-
-function parse (string) {
-  if (!string) {
-    throw new TypeError('argument string is required')
-  }
-
-  // support req/res-like objects as argument
-  var header = typeof string === 'object'
-    ? getcontenttype(string)
-    : string
-
-  if (typeof header !== 'string') {
-    throw new TypeError('argument string is required to be a string')
-  }
-
-  var index = header.indexOf(';')
-  var type = index !== -1
-    ? header.slice(0, index).trim()
-    : header.trim()
-
-  if (!TYPE_REGEXP.test(type)) {
-    throw new TypeError('invalid media type')
-  }
-
-  var obj = new ContentType(type.toLowerCase())
-
-  // parse parameters
-  if (index !== -1) {
-    var key
-    var match
-    var value
-
-    PARAM_REGEXP.lastIndex = index
-
-    while ((match = PARAM_REGEXP.exec(header))) {
-      if (match.index !== index) {
-        throw new TypeError('invalid parameter format')
-      }
-
-      index += match[0].length
-      key = match[1].toLowerCase()
-      value = match[2]
-
-      if (value.charCodeAt(0) === 0x22 /* " */) {
-        // remove quotes
-        value = value.slice(1, -1)
-
-        // remove escapes
-        if (value.indexOf('\\') !== -1) {
-          value = value.replace(QESC_REGEXP, '$1')
+  function isOriginAllowed(origin, allowedOrigin) {
+    if (Array.isArray(allowedOrigin)) {
+      for (var i = 0; i < allowedOrigin.length; ++i) {
+        if (isOriginAllowed(origin, allowedOrigin[i])) {
+          return true;
         }
       }
+      return false;
+    } else if (isString(allowedOrigin)) {
+      return origin === allowedOrigin;
+    } else if (allowedOrigin instanceof RegExp) {
+      return allowedOrigin.test(origin);
+    } else {
+      return !!allowedOrigin;
+    }
+  }
 
-      obj.parameters[key] = value
+  function configureOrigin(options, req) {
+    var requestOrigin = req.headers.origin,
+      headers = [],
+      isAllowed;
+
+    if (!options.origin || options.origin === '*') {
+      // allow any origin
+      headers.push([{
+        key: 'Access-Control-Allow-Origin',
+        value: '*'
+      }]);
+    } else if (isString(options.origin)) {
+      // fixed origin
+      headers.push([{
+        key: 'Access-Control-Allow-Origin',
+        value: options.origin
+      }]);
+      headers.push([{
+        key: 'Vary',
+        value: 'Origin'
+      }]);
+    } else {
+      isAllowed = isOriginAllowed(requestOrigin, options.origin);
+      // reflect origin
+      headers.push([{
+        key: 'Access-Control-Allow-Origin',
+        value: isAllowed ? requestOrigin : false
+      }]);
+      headers.push([{
+        key: 'Vary',
+        value: 'Origin'
+      }]);
     }
 
-    if (index !== header.length) {
-      throw new TypeError('invalid parameter format')
+    return headers;
+  }
+
+  function configureMethods(options) {
+    var methods = options.methods;
+    if (methods.join) {
+      methods = options.methods.join(','); // .methods is an array, so turn it into a string
+    }
+    return {
+      key: 'Access-Control-Allow-Methods',
+      value: methods
+    };
+  }
+
+  function configureCredentials(options) {
+    if (options.credentials === true) {
+      return {
+        key: 'Access-Control-Allow-Credentials',
+        value: 'true'
+      };
+    }
+    return null;
+  }
+
+  function configureAllowedHeaders(options, req) {
+    var allowedHeaders = options.allowedHeaders || options.headers;
+    var headers = [];
+
+    if (!allowedHeaders) {
+      allowedHeaders = req.headers['access-control-request-headers']; // .headers wasn't specified, so reflect the request headers
+      headers.push([{
+        key: 'Vary',
+        value: 'Access-Control-Request-Headers'
+      }]);
+    } else if (allowedHeaders.join) {
+      allowedHeaders = allowedHeaders.join(','); // .headers is an array, so turn it into a string
+    }
+    if (allowedHeaders && allowedHeaders.length) {
+      headers.push([{
+        key: 'Access-Control-Allow-Headers',
+        value: allowedHeaders
+      }]);
+    }
+
+    return headers;
+  }
+
+  function configureExposedHeaders(options) {
+    var headers = options.exposedHeaders;
+    if (!headers) {
+      return null;
+    } else if (headers.join) {
+      headers = headers.join(','); // .headers is an array, so turn it into a string
+    }
+    if (headers && headers.length) {
+      return {
+        key: 'Access-Control-Expose-Headers',
+        value: headers
+      };
+    }
+    return null;
+  }
+
+  function configureMaxAge(options) {
+    var maxAge = (typeof options.maxAge === 'number' || options.maxAge) && options.maxAge.toString()
+    if (maxAge && maxAge.length) {
+      return {
+        key: 'Access-Control-Max-Age',
+        value: maxAge
+      };
+    }
+    return null;
+  }
+
+  function applyHeaders(headers, res) {
+    for (var i = 0, n = headers.length; i < n; i++) {
+      var header = headers[i];
+      if (header) {
+        if (Array.isArray(header)) {
+          applyHeaders(header, res);
+        } else if (header.key === 'Vary' && header.value) {
+          vary(res, header.value);
+        } else if (header.value) {
+          res.setHeader(header.key, header.value);
+        }
+      }
     }
   }
 
-  return obj
-}
+  function cors(options, req, res, next) {
+    var headers = [],
+      method = req.method && req.method.toUpperCase && req.method.toUpperCase();
 
-/**
- * Get content-type from req/res objects.
- *
- * @param {object}
- * @return {Object}
- * @private
- */
+    if (method === 'OPTIONS') {
+      // preflight
+      headers.push(configureOrigin(options, req));
+      headers.push(configureCredentials(options, req));
+      headers.push(configureMethods(options, req));
+      headers.push(configureAllowedHeaders(options, req));
+      headers.push(configureMaxAge(options, req));
+      headers.push(configureExposedHeaders(options, req));
+      applyHeaders(headers, res);
 
-function getcontenttype (obj) {
-  var header
-
-  if (typeof obj.getHeader === 'function') {
-    // res-like
-    header = obj.getHeader('content-type')
-  } else if (typeof obj.headers === 'object') {
-    // req-like
-    header = obj.headers && obj.headers['content-type']
+      if (options.preflightContinue) {
+        next();
+      } else {
+        // Safari (and potentially other browsers) need content-length 0,
+        //   for 204 or they just hang waiting for a body
+        res.statusCode = options.optionsSuccessStatus;
+        res.setHeader('Content-Length', '0');
+        res.end();
+      }
+    } else {
+      // actual response
+      headers.push(configureOrigin(options, req));
+      headers.push(configureCredentials(options, req));
+      headers.push(configureExposedHeaders(options, req));
+      applyHeaders(headers, res);
+      next();
+    }
   }
 
-  if (typeof header !== 'string') {
-    throw new TypeError('content-type header is missing from object')
+  function middlewareWrapper(o) {
+    // if options are static (either via defaults or custom options passed in), wrap in a function
+    var optionsCallback = null;
+    if (typeof o === 'function') {
+      optionsCallback = o;
+    } else {
+      optionsCallback = function (req, cb) {
+        cb(null, o);
+      };
+    }
+
+    return function corsMiddleware(req, res, next) {
+      optionsCallback(req, function (err, options) {
+        if (err) {
+          next(err);
+        } else {
+          var corsOptions = assign({}, defaults, options);
+          var originCallback = null;
+          if (corsOptions.origin && typeof corsOptions.origin === 'function') {
+            originCallback = corsOptions.origin;
+          } else if (corsOptions.origin) {
+            originCallback = function (origin, cb) {
+              cb(null, corsOptions.origin);
+            };
+          }
+
+          if (originCallback) {
+            originCallback(req.headers.origin, function (err2, origin) {
+              if (err2 || !origin) {
+                next(err2);
+              } else {
+                corsOptions.origin = origin;
+                cors(corsOptions, req, res, next);
+              }
+            });
+          } else {
+            next();
+          }
+        }
+      });
+    };
   }
 
-  return header
-}
+  // can pass either an options hash, an options delegate, or nothing
+  module.exports = middlewareWrapper;
 
-/**
- * Quote a string if necessary.
- *
- * @param {string} val
- * @return {string}
- * @private
- */
-
-function qstring (val) {
-  var str = String(val)
-
-  // no need to quote tokens
-  if (TOKEN_REGEXP.test(str)) {
-    return str
-  }
-
-  if (str.length > 0 && !TEXT_REGEXP.test(str)) {
-    throw new TypeError('invalid parameter value')
-  }
-
-  return '"' + str.replace(QUOTE_REGEXP, '\\$1') + '"'
-}
-
-/**
- * Class to represent a content type.
- * @private
- */
-function ContentType (type) {
-  this.parameters = Object.create(null)
-  this.type = type
-}
+}());

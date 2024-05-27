@@ -1,42 +1,41 @@
 {
-  "name": "content-type",
-  "description": "Create and parse HTTP Content-Type header",
-  "version": "1.0.5",
-  "author": "Douglas Christopher Wilson <doug@somethingdoug.com>",
+  "name": "cors",
+  "description": "Node.js CORS middleware",
+  "version": "2.8.5",
+  "author": "Troy Goode <troygoode@gmail.com> (https://github.com/troygoode/)",
   "license": "MIT",
   "keywords": [
-    "content-type",
-    "http",
-    "req",
-    "res",
-    "rfc7231"
+    "cors",
+    "express",
+    "connect",
+    "middleware"
   ],
-  "repository": "jshttp/content-type",
+  "repository": "expressjs/cors",
+  "main": "./lib/index.js",
+  "dependencies": {
+    "object-assign": "^4",
+    "vary": "^1"
+  },
   "devDependencies": {
-    "deep-equal": "1.0.1",
-    "eslint": "8.32.0",
-    "eslint-config-standard": "15.0.1",
-    "eslint-plugin-import": "2.27.5",
-    "eslint-plugin-node": "11.1.0",
-    "eslint-plugin-promise": "6.1.1",
-    "eslint-plugin-standard": "4.1.0",
-    "mocha": "10.2.0",
-    "nyc": "15.1.0"
+    "after": "0.8.2",
+    "eslint": "2.13.1",
+    "express": "4.16.3",
+    "mocha": "5.2.0",
+    "nyc": "13.1.0",
+    "supertest": "3.3.0"
   },
   "files": [
-    "LICENSE",
+    "lib/index.js",
+    "CONTRIBUTING.md",
     "HISTORY.md",
-    "README.md",
-    "index.js"
+    "LICENSE",
+    "README.md"
   ],
   "engines": {
-    "node": ">= 0.6"
+    "node": ">= 0.10"
   },
   "scripts": {
-    "lint": "eslint .",
-    "test": "mocha --reporter spec --check-leaks --bail test/",
-    "test-ci": "nyc --reporter=lcovonly --reporter=text npm test",
-    "test-cov": "nyc --reporter=html --reporter=text npm test",
-    "version": "node scripts/version-history.js && git add HISTORY.md"
+    "test": "npm run lint && nyc --reporter=html --reporter=text mocha --require test/support/env",
+    "lint": "eslint lib test"
   }
 }
