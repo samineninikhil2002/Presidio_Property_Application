@@ -1,3 +1,3 @@
-declare const defineProperty: false | typeof Object.defineProperty;
+declare function hasOwn<O, K extends PropertyKey, V = unknown>(o: O, p: K): o is O & Record<K, V>;
 
-export = defineProperty;
+export = hasOwn;
