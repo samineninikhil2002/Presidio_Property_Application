@@ -1,238 +1,392 @@
-(function () {
+'use strict';
 
-  'use strict';
+var test = require('tape');
+var v = require('es-value-fixtures');
+var forEach = require('for-each');
+var inspect = require('object-inspect');
+var hasOwn = require('hasown');
+var hasPropertyDescriptors = require('has-property-descriptors')();
+var getOwnPropertyDescriptors = require('object.getownpropertydescriptors');
+var ownKeys = require('reflect.ownkeys');
 
-  var assign = require('object-assign');
-  var vary = require('vary');
+var defineDataProperty = require('../');
 
-  var defaults = {
-    origin: '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    preflightContinue: false,
-    optionsSuccessStatus: 204
-  };
+test('defineDataProperty', function (t) {
+	t.test('argument validation', function (st) {
+		forEach(v.primitives, function (nonObject) {
+			st['throws'](
+				// @ts-expect-error
+				function () { defineDataProperty(nonObject, 'key', 'value'); },
+				TypeError,
+				'throws on non-object input: ' + inspect(nonObject)
+			);
+		});
 
-  function isString(s) {
-    return typeof s === 'string' || s instanceof String;
-  }
+		forEach(v.nonPropertyKeys, function (nonPropertyKey) {
+			st['throws'](
+				// @ts-expect-error
+				function () { defineDataProperty({}, nonPropertyKey, 'value'); },
+				TypeError,
+				'throws on non-PropertyKey input: ' + inspect(nonPropertyKey)
+			);
+		});
 
-  function isOriginAllowed(origin, allowedOrigin) {
-    if (Array.isArray(allowedOrigin)) {
-      for (var i = 0; i < allowedOrigin.length; ++i) {
-        if (isOriginAllowed(origin, allowedOrigin[i])) {
-          return true;
-        }
-      }
-      return false;
-    } else if (isString(allowedOrigin)) {
-      return origin === allowedOrigin;
-    } else if (allowedOrigin instanceof RegExp) {
-      return allowedOrigin.test(origin);
-    } else {
-      return !!allowedOrigin;
-    }
-  }
+		forEach(v.nonBooleans, function (nonBoolean) {
+			if (nonBoolean !== null) {
+				st['throws'](
+					// @ts-expect-error
+					function () { defineDataProperty({}, 'key', 'value', nonBoolean); },
+					TypeError,
+					'throws on non-boolean nonEnumerable: ' + inspect(nonBoolean)
+				);
 
-  function configureOrigin(options, req) {
-    var requestOrigin = req.headers.origin,
-      headers = [],
-      isAllowed;
+				st['throws'](
+					// @ts-expect-error
+					function () { defineDataProperty({}, 'key', 'value', false, nonBoolean); },
+					TypeError,
+					'throws on non-boolean nonWritable: ' + inspect(nonBoolean)
+				);
 
-    if (!options.origin || options.origin === '*') {
-      // allow any origin
-      headers.push([{
-        key: 'Access-Control-Allow-Origin',
-        value: '*'
-      }]);
-    } else if (isString(options.origin)) {
-      // fixed origin
-      headers.push([{
-        key: 'Access-Control-Allow-Origin',
-        value: options.origin
-      }]);
-      headers.push([{
-        key: 'Vary',
-        value: 'Origin'
-      }]);
-    } else {
-      isAllowed = isOriginAllowed(requestOrigin, options.origin);
-      // reflect origin
-      headers.push([{
-        key: 'Access-Control-Allow-Origin',
-        value: isAllowed ? requestOrigin : false
-      }]);
-      headers.push([{
-        key: 'Vary',
-        value: 'Origin'
-      }]);
-    }
+				st['throws'](
+					// @ts-expect-error
+					function () { defineDataProperty({}, 'key', 'value', false, false, nonBoolean); },
+					TypeError,
+					'throws on non-boolean nonConfigurable: ' + inspect(nonBoolean)
+				);
+			}
+		});
 
-    return headers;
-  }
+		st.end();
+	});
 
-  function configureMethods(options) {
-    var methods = options.methods;
-    if (methods.join) {
-      methods = options.methods.join(','); // .methods is an array, so turn it into a string
-    }
-    return {
-      key: 'Access-Control-Allow-Methods',
-      value: methods
-    };
-  }
+	t.test('normal data property', function (st) {
+		/** @type {Record<PropertyKey, string>} */
+		var obj = { existing: 'existing property' };
+		st.ok(hasOwn(obj, 'existing'), 'has initial own property');
+		st.equal(obj.existing, 'existing property', 'has expected initial value');
 
-  function configureCredentials(options) {
-    if (options.credentials === true) {
-      return {
-        key: 'Access-Control-Allow-Credentials',
-        value: 'true'
-      };
-    }
-    return null;
-  }
+		var res = defineDataProperty(obj, 'added', 'added property');
+		st.equal(res, void undefined, 'returns `undefined`');
+		st.ok(hasOwn(obj, 'added'), 'has expected own property');
+		st.equal(obj.added, 'added property', 'has expected value');
 
-  function configureAllowedHeaders(options, req) {
-    var allowedHeaders = options.allowedHeaders || options.headers;
-    var headers = [];
+		defineDataProperty(obj, 'existing', 'new value');
+		st.ok(hasOwn(obj, 'existing'), 'still has expected own property');
+		st.equal(obj.existing, 'new value', 'has new expected value');
 
-    if (!allowedHeaders) {
-      allowedHeaders = req.headers['access-control-request-headers']; // .headers wasn't specified, so reflect the request headers
-      headers.push([{
-        key: 'Vary',
-        value: 'Access-Control-Request-Headers'
-      }]);
-    } else if (allowedHeaders.join) {
-      allowedHeaders = allowedHeaders.join(','); // .headers is an array, so turn it into a string
-    }
-    if (allowedHeaders && allowedHeaders.length) {
-      headers.push([{
-        key: 'Access-Control-Allow-Headers',
-        value: allowedHeaders
-      }]);
-    }
+		defineDataProperty(obj, 'explicit1', 'new value', false);
+		st.ok(hasOwn(obj, 'explicit1'), 'has expected own property (explicit enumerable)');
+		st.equal(obj.explicit1, 'new value', 'has new expected value (explicit enumerable)');
 
-    return headers;
-  }
+		defineDataProperty(obj, 'explicit2', 'new value', false, false);
+		st.ok(hasOwn(obj, 'explicit2'), 'has expected own property (explicit writable)');
+		st.equal(obj.explicit2, 'new value', 'has new expected value (explicit writable)');
 
-  function configureExposedHeaders(options) {
-    var headers = options.exposedHeaders;
-    if (!headers) {
-      return null;
-    } else if (headers.join) {
-      headers = headers.join(','); // .headers is an array, so turn it into a string
-    }
-    if (headers && headers.length) {
-      return {
-        key: 'Access-Control-Expose-Headers',
-        value: headers
-      };
-    }
-    return null;
-  }
+		defineDataProperty(obj, 'explicit3', 'new value', false, false, false);
+		st.ok(hasOwn(obj, 'explicit3'), 'has expected own property (explicit configurable)');
+		st.equal(obj.explicit3, 'new value', 'has new expected value (explicit configurable)');
 
-  function configureMaxAge(options) {
-    var maxAge = (typeof options.maxAge === 'number' || options.maxAge) && options.maxAge.toString()
-    if (maxAge && maxAge.length) {
-      return {
-        key: 'Access-Control-Max-Age',
-        value: maxAge
-      };
-    }
-    return null;
-  }
+		st.end();
+	});
 
-  function applyHeaders(headers, res) {
-    for (var i = 0, n = headers.length; i < n; i++) {
-      var header = headers[i];
-      if (header) {
-        if (Array.isArray(header)) {
-          applyHeaders(header, res);
-        } else if (header.key === 'Vary' && header.value) {
-          vary(res, header.value);
-        } else if (header.value) {
-          res.setHeader(header.key, header.value);
-        }
-      }
-    }
-  }
+	t.test('loose mode', { skip: !hasPropertyDescriptors }, function (st) {
+		var obj = { existing: 'existing property' };
 
-  function cors(options, req, res, next) {
-    var headers = [],
-      method = req.method && req.method.toUpperCase && req.method.toUpperCase();
+		defineDataProperty(obj, 'added', 'added value 1', true, null, null, true);
+		st.deepEqual(
+			getOwnPropertyDescriptors(obj),
+			{
+				existing: {
+					configurable: true,
+					enumerable: true,
+					value: 'existing property',
+					writable: true
+				},
+				added: {
+					configurable: true,
+					enumerable: !hasPropertyDescriptors,
+					value: 'added value 1',
+					writable: true
+				}
+			},
+			'in loose mode, obj still adds property 1'
+		);
 
-    if (method === 'OPTIONS') {
-      // preflight
-      headers.push(configureOrigin(options, req));
-      headers.push(configureCredentials(options, req));
-      headers.push(configureMethods(options, req));
-      headers.push(configureAllowedHeaders(options, req));
-      headers.push(configureMaxAge(options, req));
-      headers.push(configureExposedHeaders(options, req));
-      applyHeaders(headers, res);
+		defineDataProperty(obj, 'added', 'added value 2', false, true, null, true);
+		st.deepEqual(
+			getOwnPropertyDescriptors(obj),
+			{
+				existing: {
+					configurable: true,
+					enumerable: true,
+					value: 'existing property',
+					writable: true
+				},
+				added: {
+					configurable: true,
+					enumerable: true,
+					value: 'added value 2',
+					writable: !hasPropertyDescriptors
+				}
+			},
+			'in loose mode, obj still adds property 2'
+		);
 
-      if (options.preflightContinue) {
-        next();
-      } else {
-        // Safari (and potentially other browsers) need content-length 0,
-        //   for 204 or they just hang waiting for a body
-        res.statusCode = options.optionsSuccessStatus;
-        res.setHeader('Content-Length', '0');
-        res.end();
-      }
-    } else {
-      // actual response
-      headers.push(configureOrigin(options, req));
-      headers.push(configureCredentials(options, req));
-      headers.push(configureExposedHeaders(options, req));
-      applyHeaders(headers, res);
-      next();
-    }
-  }
+		defineDataProperty(obj, 'added', 'added value 3', false, false, true, true);
+		st.deepEqual(
+			getOwnPropertyDescriptors(obj),
+			{
+				existing: {
+					configurable: true,
+					enumerable: true,
+					value: 'existing property',
+					writable: true
+				},
+				added: {
+					configurable: !hasPropertyDescriptors,
+					enumerable: true,
+					value: 'added value 3',
+					writable: true
+				}
+			},
+			'in loose mode, obj still adds property 3'
+		);
 
-  function middlewareWrapper(o) {
-    // if options are static (either via defaults or custom options passed in), wrap in a function
-    var optionsCallback = null;
-    if (typeof o === 'function') {
-      optionsCallback = o;
-    } else {
-      optionsCallback = function (req, cb) {
-        cb(null, o);
-      };
-    }
+		st.end();
+	});
 
-    return function corsMiddleware(req, res, next) {
-      optionsCallback(req, function (err, options) {
-        if (err) {
-          next(err);
-        } else {
-          var corsOptions = assign({}, defaults, options);
-          var originCallback = null;
-          if (corsOptions.origin && typeof corsOptions.origin === 'function') {
-            originCallback = corsOptions.origin;
-          } else if (corsOptions.origin) {
-            originCallback = function (origin, cb) {
-              cb(null, corsOptions.origin);
-            };
-          }
+	t.test('non-normal data property, ES3', { skip: hasPropertyDescriptors }, function (st) {
+		/** @type {Record<PropertyKey, string>} */
+		var obj = { existing: 'existing property' };
 
-          if (originCallback) {
-            originCallback(req.headers.origin, function (err2, origin) {
-              if (err2 || !origin) {
-                next(err2);
-              } else {
-                corsOptions.origin = origin;
-                cors(corsOptions, req, res, next);
-              }
-            });
-          } else {
-            next();
-          }
-        }
-      });
-    };
-  }
+		st['throws'](
+			function () { defineDataProperty(obj, 'added', 'added value', true); },
+			SyntaxError,
+			'nonEnumerable throws a Syntax Error'
+		);
 
-  // can pass either an options hash, an options delegate, or nothing
-  module.exports = middlewareWrapper;
+		st['throws'](
+			function () { defineDataProperty(obj, 'added', 'added value', false, true); },
+			SyntaxError,
+			'nonWritable throws a Syntax Error'
+		);
 
-}());
+		st['throws'](
+			function () { defineDataProperty(obj, 'added', 'added value', false, false, true); },
+			SyntaxError,
+			'nonWritable throws a Syntax Error'
+		);
+
+		st.deepEqual(
+			ownKeys(obj),
+			['existing'],
+			'obj still has expected keys'
+		);
+		st.equal(obj.existing, 'existing property', 'obj still has expected values');
+
+		st.end();
+	});
+
+	t.test('new non-normal data property, ES5+', { skip: !hasPropertyDescriptors }, function (st) {
+		/** @type {Record<PropertyKey, string>} */
+		var obj = { existing: 'existing property' };
+
+		defineDataProperty(obj, 'nonEnum', null, true);
+		defineDataProperty(obj, 'nonWrit', null, false, true);
+		defineDataProperty(obj, 'nonConf', null, false, false, true);
+
+		st.deepEqual(
+			getOwnPropertyDescriptors(obj),
+			{
+				existing: {
+					configurable: true,
+					enumerable: true,
+					value: 'existing property',
+					writable: true
+				},
+				nonEnum: {
+					configurable: true,
+					enumerable: false,
+					value: null,
+					writable: true
+				},
+				nonWrit: {
+					configurable: true,
+					enumerable: true,
+					value: null,
+					writable: false
+				},
+				nonConf: {
+					configurable: false,
+					enumerable: true,
+					value: null,
+					writable: true
+				}
+			},
+			'obj has expected property descriptors'
+		);
+
+		st.end();
+	});
+
+	t.test('existing non-normal data property, ES5+', { skip: !hasPropertyDescriptors }, function (st) {
+		// test case changing an existing non-normal property
+
+		/** @type {Record<string, null | string>} */
+		var obj = {};
+		Object.defineProperty(obj, 'nonEnum', { configurable: true, enumerable: false, value: null, writable: true });
+		Object.defineProperty(obj, 'nonWrit', { configurable: true, enumerable: true, value: null, writable: false });
+		Object.defineProperty(obj, 'nonConf', { configurable: false, enumerable: true, value: null, writable: true });
+
+		st.deepEqual(
+			getOwnPropertyDescriptors(obj),
+			{
+				nonEnum: {
+					configurable: true,
+					enumerable: false,
+					value: null,
+					writable: true
+				},
+				nonWrit: {
+					configurable: true,
+					enumerable: true,
+					value: null,
+					writable: false
+				},
+				nonConf: {
+					configurable: false,
+					enumerable: true,
+					value: null,
+					writable: true
+				}
+			},
+			'obj initially has expected property descriptors'
+		);
+
+		defineDataProperty(obj, 'nonEnum', 'new value', false);
+		defineDataProperty(obj, 'nonWrit', 'new value', false, false);
+		st['throws'](
+			function () { defineDataProperty(obj, 'nonConf', 'new value', false, false, false); },
+			TypeError,
+			'can not alter a nonconfigurable property'
+		);
+
+		st.deepEqual(
+			getOwnPropertyDescriptors(obj),
+			{
+				nonEnum: {
+					configurable: true,
+					enumerable: true,
+					value: 'new value',
+					writable: true
+				},
+				nonWrit: {
+					configurable: true,
+					enumerable: true,
+					value: 'new value',
+					writable: true
+				},
+				nonConf: {
+					configurable: false,
+					enumerable: true,
+					value: null,
+					writable: true
+				}
+			},
+			'obj ends up with expected property descriptors'
+		);
+
+		st.end();
+	});
+
+	t.test('frozen object, ES5+', { skip: !hasPropertyDescriptors }, function (st) {
+		var frozen = Object.freeze({ existing: true });
+
+		st['throws'](
+			function () { defineDataProperty(frozen, 'existing', 'new value'); },
+			TypeError,
+			'frozen object can not modify an existing property'
+		);
+
+		st['throws'](
+			function () { defineDataProperty(frozen, 'new', 'new property'); },
+			TypeError,
+			'frozen object can not add a new property'
+		);
+
+		st.end();
+	});
+
+	t.test('sealed object, ES5+', { skip: !hasPropertyDescriptors }, function (st) {
+		var sealed = Object.seal({ existing: true });
+		st.deepEqual(
+			Object.getOwnPropertyDescriptor(sealed, 'existing'),
+			{
+				configurable: false,
+				enumerable: true,
+				value: true,
+				writable: true
+			},
+			'existing value on sealed object has expected descriptor'
+		);
+
+		defineDataProperty(sealed, 'existing', 'new value');
+
+		st.deepEqual(
+			Object.getOwnPropertyDescriptor(sealed, 'existing'),
+			{
+				configurable: false,
+				enumerable: true,
+				value: 'new value',
+				writable: true
+			},
+			'existing value on sealed object has changed descriptor'
+		);
+
+		st['throws'](
+			function () { defineDataProperty(sealed, 'new', 'new property'); },
+			TypeError,
+			'sealed object can not add a new property'
+		);
+
+		st.end();
+	});
+
+	t.test('nonextensible object, ES5+', { skip: !hasPropertyDescriptors }, function (st) {
+		var nonExt = Object.preventExtensions({ existing: true });
+
+		st.deepEqual(
+			Object.getOwnPropertyDescriptor(nonExt, 'existing'),
+			{
+				configurable: true,
+				enumerable: true,
+				value: true,
+				writable: true
+			},
+			'existing value on non-extensible object has expected descriptor'
+		);
+
+		defineDataProperty(nonExt, 'existing', 'new value', true);
+
+		st.deepEqual(
+			Object.getOwnPropertyDescriptor(nonExt, 'existing'),
+			{
+				configurable: true,
+				enumerable: false,
+				value: 'new value',
+				writable: true
+			},
+			'existing value on non-extensible object has changed descriptor'
+		);
+
+		st['throws'](
+			function () { defineDataProperty(nonExt, 'new', 'new property'); },
+			TypeError,
+			'non-extensible object can not add a new property'
+		);
+
+		st.end();
+	});
+
+	t.end();
+});
